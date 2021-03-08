@@ -1,0 +1,23 @@
+variables:
+  os-series:           &os-series            bionic
+machines:
+  '0': # for MAAS
+    series: *os-series
+    constraints: cpu-cores=2 mem=8G root-disk=20G
+  '1': # for LXD KVM host
+    series: *os-series
+    constraints: instance-type=c5.metal
+
+series: *os-series
+
+applications:
+  maas:
+    charm: cs:ubuntu
+    num_units: 1
+    to:
+    - '0'
+  lxd-host:
+    charm: cs:ubuntu
+    num_units: 1
+    to:
+    - '1'
