@@ -1,0 +1,63 @@
+juju bootstrap aws/eu-central-1 openstack
+juju add-model maas
+juju add-model --no-switch openstack
+juju switch maas/openstack
+juju deploy ./maas-aws.yaml
+juju deploy --model openstack ./openstack-base-bionic-ussuri/bundle.yaml
+
+
+# MAAS post-steps
+juju run -u maas/leader 'open-port 5240'
+juju expose maas
+juju run -u lxd-host/leader 'open-port 8443'
+juju expose lxd-host
+
+snap install maas maas-test-db
+maas init region+rack --database-uri maas-test-db:///
+maas createadmin --username gabor --password gabor --email gabor
+maas status
+
+apt remove -y --autoremove lxd; snap install lxd; lxd init
+
+ssh-import-id lp:gabor.meszaros
+~/.local/bin/sshuttle -l 0 -r 18.159.62.228 252.0.0.0/8
+
+netplan:
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    enp125s0:
+              dhcp4: false
+              dhcp6: false
+
+  bridges:
+    br0:
+      interfaces: [enp125s0]
+      addresses: [172.31.27.7/20]
+      gateway4: 172.31.16.1
+      mtu: 1500
+      nameservers:
+                addresses: [172.31.0.2]
+      parameters:
+                stp: true
+                forward-delay: 4
+      dhcp4: no
+      dhcp6: no
+
+
+#  Openstack post-steps
+watch --color -- juju status --color --model openstack
+_juju_model_arg='--model openstack' source openrc
+
+
+
+
+# reconfigure FAN networking:
+# https://discourse.charmhub.io/t/fan-container-networking/1065
+# https://juju.is/docs/fan-container-networking
+# https://discourse.charmhub.io/t/configuring-models/1151
+# juju model-config fan-config=10.0.0.0/16=252.0.0.0/8
+# juju model-config container-networking-method=fan
+# check if VPC can be configured via juju
